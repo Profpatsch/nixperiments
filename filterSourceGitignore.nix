@@ -74,6 +74,7 @@ let
       testEmpty = t "" "";
       testComment1 = t "#" "";
       testComment2 = t "# comment" "";
+      testComment3 = t ''# comment *.with \special/characters'' "";
       # testInversion = t "!abc" "???";
       testNormal1 = t "abc" "abc";
       testNormal2 = t "/fo*/bar/" "/fo*/bar/";
@@ -111,7 +112,10 @@ let
       abort "toPathSpec: should not happen (nothing matched)"
     else if at 0 == "*" then { starGlob = {}; }
     else if at 1 != null then
-      abort ''.gitignore: We don’t support these globbing metacharacters: ?\[*''
+      abort ''
+        .gitignore: We don’t support these globbing metacharacters: ?\[*
+        The problematic line is ${elem}
+      ''
     else let two = at 2;
       in if two != null then { literal = two; }
     else abort "toPathSpec: should not happen (${toString res})";
@@ -302,13 +306,13 @@ let
       globs = mapMaybe (p: match {
           ignored = _: null;
           glob = lib.id;
-        } (toGlobSpec p))
+        } (toGlobSpec (matchLine p)))
         (splitLines (builtins.readFile gitignorePath));
       # the actual predicate that returns whether a file should be ignored
       shouldIgnore = path: type:
         assert lib.assertMsg (type != "unknown")
-          ''filterSourceGitignore: file ${path} is of type "unknown"''
-          + ", which we don’t support";
+          (''filterSourceGitignore: file ${path} is of type "unknown"''
+          + ", which we don’t support");
         # remove the absolute path prefix
         # of the parent dir of our gitignore
         # (the globs are relative to the gitignore file)
