@@ -1,5 +1,7 @@
+{ nixpkgs ? <nixpkgs> }:
 let
-  lib = import <nixpkgs/lib>;
+  lib = import "${toString nixpkgs}/lib";
+  pkgs = import nixpkgs {};
 
 in rec {
   match = import ./match.nix
@@ -8,4 +10,11 @@ in rec {
   filterSourceGitignore = import ./filterSourceGitignore.nix
     { inherit lib match; };
 
+  inherit (import ./package-tests {
+             inherit (pkgs) runCommand;
+             inherit lib;
+           })
+    drvSeq
+    drvSeqL
+    withTests;
 }
