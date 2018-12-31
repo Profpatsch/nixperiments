@@ -1,6 +1,7 @@
 { nixpkgs ? <nixpkgs> }:
 let
-  lib = import "${toString nixpkgs}/lib";
+  libPath = "${toString nixpkgs}/lib";
+  lib = import libPath;
   pkgs = import nixpkgs {};
 
 in rec {
@@ -28,4 +29,12 @@ in rec {
 
   setupLocalNixStore = import ./setup-local-nix-store.nix
     { inherit pkgs withTests; };
+
+  inherit (import ./nix-json-trans.nix {
+             inherit pkgs libPath
+                     script setupLocalNixStore
+                     withTests;
+          })
+    json2json
+    json2string;
 }
