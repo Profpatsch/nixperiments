@@ -25,4 +25,7 @@ in rec {
     withOptions
     optionChecks;
   };
+
+  setupLocalNixStore = import ./setup-local-nix-store.nix
+    { inherit pkgs withTests; };
 }
