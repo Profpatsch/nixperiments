@@ -13,8 +13,16 @@ in rec {
   inherit (import ./package-tests {
              inherit (pkgs) runCommand;
              inherit lib;
-           })
+          })
     drvSeq
     drvSeqL
     withTests;
+
+  script = {
+    inherit (import ./write-script-argparse {
+               inherit (pkgs) callPackage;
+            })
+    withOptions
+    optionChecks;
+  };
 }
