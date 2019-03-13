@@ -1,8 +1,8 @@
-{ nixpkgs ? <nixpkgs> }:
+{ nixpkgs ? import <nixpkgs> {} }:
 let
-  libPath = "${toString nixpkgs}/lib";
-  lib = import libPath;
-  pkgs = import nixpkgs {};
+  libPath = "${nixpkgs.path}/lib";
+  pkgs = nixpkgs;
+  lib = pkgs.lib;
 
 in rec {
   match = import ./match.nix
