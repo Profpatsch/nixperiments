@@ -24,7 +24,8 @@ in rec {
                inherit (pkgs) callPackage;
             })
     withOptions
-    optionChecks;
+    optionChecks
+    argsChecks;
   };
 
   setupLocalNixStore = import ./setup-local-nix-store.nix

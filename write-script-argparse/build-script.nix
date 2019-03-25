@@ -1,4 +1,4 @@
-{ stdenv, lib, writeText, writeScript, runCommand, utillinux }:
+{ runtimeShell, lib, writeText, writeScript, runCommand, utillinux }:
 # Create a bash script and automatically generate an option parser.
 # The option names are put into scope as plain bash variables.
 {
@@ -18,9 +18,17 @@
   # where `check` is of type
   # { fnName : string # check bash function name
   # , name : string # name displayed in usage
-  # , code : lines # bash code of the check
+  # , code : lines # bash code of the check;
+  #                  for each error it finds it appends a line to `$ERRS__`
   # }
   options,
+  # attrset of type { description : String, name : String }
+  # If it is set, there will be a description for
+  # what the rest of argv is going to be once all
+  # options are parsed. If it is unset (null), there
+  # will be an error if any non-options are given.
+  # Name is displayed in the usage, for example PROG or ARGS.
+  extraArgs ? null,
   # bash script that has all options in scope
   # as variables of the same name
   # : lines
@@ -32,14 +40,17 @@ let
     let
       checks = lib.concatMapStringsSep ", " (c: c.name);
       usageAttr = n: v: "--${n} (${checks v.checks}): ${v.description}";
+      usageExtraArgs = lib.optional (extraArgs != null)
+        "-- ${extraArgs.name}... ${extraArgs.description}";
     in
       writeText "${name}-usage.txt" ''
         ${name}: ${synopsis}
-
-        ${description}
+        ${if description != "" then "\n" + description + "\n" else ""}
+        Usage:
         ${name}
           ${builtins.concatStringsSep "\n  "
-              (lib.mapAttrsToList usageAttr options)}
+              (lib.mapAttrsToList usageAttr options
+              ++ usageExtraArgs)}
       '';
 
   # bash function that prints usage to stderr
@@ -58,8 +69,9 @@ let
   ourChecks =
     # we can remove duplicate checks because they are static
     lib.unique
-      (builtins.concatLists
-        (lib.mapAttrsToList (_: opt: opt.checks) options));
+      ((builtins.concatLists
+         (lib.mapAttrsToList (_: opt: opt.checks) options))
+       ++ extraArgs.checks or []);
 
   # check bash functions
   checkFns =
@@ -108,15 +120,18 @@ let
       embed = builtins.concatLists;
       applyIndent = builtins.concatStringsSep "\n";
 
-      # a check inside an argument handler
-      runCheck = argName: c: embed [
-        (i0 ''${c.fnName} "$2" \'')
-        (i2 (i0 ''|| ERRS__+="--${argName}: file '$2' does not exist\n"''))
-      ];
-      # generated argument handler for each option
-      argHandler = name: opt: embed [
+      # A check inside an option handler.
+      # $1 is the option name (as `--opt`)
+      # $2 is the value
+      runOptionCheck = c: ''${c.fnName} "$1" "$2"'';
+      # A check of the extraArguments.
+      # They are passed as array (`$@`).
+      runArgumentCheck = c: ''${c.fnName} "$@"'';
+
+      # generated case handler for each option
+      optionCaseHandler = name: opt: embed [
         (i0 ''--${name})'')
-        (i2 (embed (map (runCheck name) opt.checks)))
+        (i2 (map runOptionCheck opt.checks))
         (i2 [
           ''${name}="$2"''
           ''shift 2''
@@ -125,28 +140,39 @@ let
       ];
     in ''
       # accumulate errors
-      ERRS_=
+      ERRS__=
+      function ERRS_add__ {
+        ERRS__+="$1\n"
+      }
       # parse getopt output
       while true; do
         case "$1" in
       ${applyIndent
-          (i4 (embed (lib.mapAttrsToList argHandler options)))}
+          (i4 (embed (lib.mapAttrsToList optionCaseHandler options)))}
           --)
             shift
-            # no further arguments
-            [[ $# -ne 0 ]] \
-              && ERRS__+="too many arguments: $@"
+      ${applyIndent (indent 6
+          (if extraArgs == null then [
+            ''# no further arguments''
+            ''[[ $# -ne 0 ]] \''
+            ''  && ERRS_add__ "Too many arguments: $@"''
+          ] else [
+            ''# there must be further arguments''
+            ''[[ $# -eq 0 ]] \''
+            ''  && ERRS_add__ "Missing extra arguments ${extraArgs.name}..."''
+            ''# check arguments''
+          ] ++ map runArgumentCheck extraArgs.checks))}
             break
             ;;
           *)
-            ERRS__+="unknown argument: $1\n"
+            ERRS_add__ "Unknown argument: $1"
             shift 1
             ;;
         esac
       done
       # check if there were errors
       [[ "$ERRS__" != "" ]] \
-        && USAGE__ "Argument errors:\n$ERRS__"
+        && USAGE__ "\n$ERRS__"
     '';
 
   # we abort on missing options
@@ -158,7 +184,7 @@ let
           || ERRS__+=" --$opt"
       done
       [[ "$ERRS__" != "" ]] \
-        && USAGE__ "options$ERRS__ are required"
+        && USAGE__ "Options$ERRS__ are required"
     '';
 
   # the optparser, which is sourced by the final script
@@ -170,7 +196,7 @@ let
     # https://stackoverflow.com/a/29754866/1382925
 
     ${usageFn}
-    [[ $# -eq 0 ]] && USAGE__ "no arguments given"
+    [[ $# -eq 0 ]] && USAGE__ "No arguments given"
 
     ${checkFns}
     ${getopt}
@@ -180,6 +206,7 @@ let
     # unset all variables, as to not lead to strange
     # effects in the following script
     unset -v PARSED__ ERRS__
+    unset -f ERRS_add__
     unset -f USAGE__
     unset -f ${lib.concatMapStringsSep " " (c: c.fnName) ourChecks}
   '';
@@ -188,7 +215,7 @@ let
   # and the actual script logic should not be shadowed by that.
   # TODO: maybe invert it, that you call the argparser yourself?
   finalScript = writeScript name ''
-    #!${stdenv.shell}
+    #!${runtimeShell}
     # call the argparser, which sets the following variables:
     # ${nameMapOptsSep ", " lib.id}
     source ${optParser}
