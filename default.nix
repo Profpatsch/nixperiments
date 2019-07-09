@@ -8,6 +8,9 @@ in rec {
   match = import ./match.nix
     { inherit lib; };
 
+  types = import ./simple-types.nix
+    { inherit lib; };
+
   filterSourceGitignore = import ./filterSourceGitignore.nix
     { inherit lib match; };
 
