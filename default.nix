@@ -8,7 +8,7 @@ in rec {
   match = import ./match.nix
     { inherit lib; };
 
-  types = import ./simple-types.nix
+  types = import ./simple-types
     { inherit lib; };
 
   filterSourceGitignore = import ./filterSourceGitignore.nix
