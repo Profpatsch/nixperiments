@@ -268,4 +268,20 @@ in {
     [ "b" "d" "a" ]
     { "1" = err (enum string [ "a" "b" "c" ]) "d"; };
 
-}))
+})
+//
+{
+  testSelfRecursive =
+    let t = list t; in test
+      (recurse { type = t; description = "t"; })
+      [[[]]]
+      ok;
+
+  testSelfRecurseFoo =
+    let t = sum {
+      a = (recurse { type = t; description = "t"; });
+      b = unit; };
+    in test t
+      [[{}]]
+      (err t [[{}]]);
+})

@@ -407,6 +407,25 @@ let
     check = v: type.check v && check v;
   };
 
+  # Recursion breaker.
+  # If you have a self-recursive (or mutually recursive) type,
+  # the description is going to lead to an infinite recursion.
+  # Use this to give an alternative description.
+  #
+  # TODO: the user should not have to worry about this,
+  # rather the descriptions themselves should notice.
+  # The final solution is probably going to be something
+  # like a poly-variadic fix point type, which the users
+  # can use to define self-recursive (and mutually recursive)
+  # types with nice error messages.
+  # See http://okmij.org/ftp/Computation/fixed-point-combinators.html#Poly-variadic
+  recurse = {
+    description,
+    type
+  }: type // {
+    inherit description;
+  };
+
   # TODO: should scalars be allowed as nest types?
   # TODO: how to implement?
   # nested = nest: t: mkBaseType {
@@ -444,7 +463,7 @@ let
     # Their internal structure/fields are an *implementation detail*.
     inherit void any unit bool string path int float
             list attrs product productOpt sum union
-            restrict;
+            restrict recurse;
     # Type checking.
     inherit checkType;
     # Functions.
