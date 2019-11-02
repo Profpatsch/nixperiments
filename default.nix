@@ -14,6 +14,9 @@ in rec {
   filterSourceGitignore = import ./filterSourceGitignore.nix
     { inherit lib match; };
 
+  filterSourceRegex = import ./filterSourceRegex.nix
+    { inherit lib match; };
+
   inherit (import ./package-tests {
              inherit (pkgs) runCommand;
              inherit lib;
