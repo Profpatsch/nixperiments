@@ -1,6 +1,6 @@
 { nixpkgs ? import <nixpkgs> {} }:
 let
-  libPath = "${nixpkgs.path}/lib";
+  libPath = "${toString nixpkgs.path}/lib";
   pkgs = nixpkgs;
   lib = pkgs.lib;
 
