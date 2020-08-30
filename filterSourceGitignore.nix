@@ -276,12 +276,14 @@ let
       testNonRootedDirBad = n dir "hi/*" "baz/nope/foo";
     };
 
-  # takes a path to a .gitignore file, and a source directory,
-  # and uses the .gitignore file as the predicate on which files
+  # takes a source directory, and uses the .gitignore file
+  # in that source directory as the predicate for which files
   # to copy to the nix store.
-  filterSourceGitignore = gitignorePath: src:
+  # If you need control over which .gitignore files/lines
+  # to use, use filterSourceGitignoreWith.
+  filterSourceGitignore = src:
     filterSourceGitignoreWith {
-      globs = splitLines (builtins.readFile gitignorePath);
+      globs = splitLines (builtins.readFile "${toString src}/.gitignore");
     } src;
 
   filterSourceGitignoreWith = {
