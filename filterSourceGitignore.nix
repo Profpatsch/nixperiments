@@ -10,7 +10,6 @@
 # - Trailing spaces are not ignored.
 # - Negations are not implemented (but recognized).
 # - ** is not implemented.
-# - * is only implemented if it is alone in a path segment.
 # - ? is not implemented.
 # - Bracketing with [] is not implemented.
 # - The character \ is forbidden alltogether because we
@@ -82,9 +81,9 @@ let
 
   pathElemMatchers = builtins.concatStringsSep "|" [
     ''.*([[?\]).*''   # 0: check for unsupported metacharacters
-    ''(\*)''           # 1: a string with exactly one * is supported
-    # ''.*(\\*\\*).*'' # check for **, not supported
-    ''(.*)''           # 2: anything else
+    ''.*(\*\*).*'' # 1: check for unsupported double glob
+    ''(.*\*.*)'' # 2: a string containing a simple glob is supported
+    ''(.*)''           # 3: anything else
   ];
 
   # GlobSpec:
@@ -99,7 +98,7 @@ let
   # }
   # PathSpec:
   # sum
-  #  { glob : Unit
+  #  { glob : String
   #  , literal : String
   #  }
 
@@ -111,13 +110,20 @@ let
       abort "toPathSpec: should not happen (nothing matched)"
     else if at 0 != null then
       abort ''
-        .gitignore: We don’t support these globbing metacharacters: ?\[*
+        .gitignore: We don’t support these globbing metacharacters: ?\[
         The problematic line is ${elem}
       ''
-    else if at 1 == "*" then { starGlob = {}; }
+    else let one = at 1;
+      in if one != null then
+      abort ''
+         .gitignore: We don’t support ** globbing.
+        The problematic line is ${elem}
+      ''
     else let two = at 2;
-      in if two != null then { literal = two; }
-    else abort "toPathSpec: should not happen (${toString res})";
+      in if two != null then { starGlob = two; }
+    else let three = at 3;
+      in if three != null then { literal = three; }
+    else abort "toPathSpec: should not happen (${toString res}";
 
   # Convert a line from a .gitignore file to a GlobSpec.
   toGlobSpec = line:
@@ -153,7 +159,7 @@ let
           } // args;
         };
         lit = x: { literal = x; };
-        starGlob = { starGlob = {}; };
+        starGlob = s: { starGlob = s; };
     in lib.runTests {
       testIgnore = t "" ignored;
       testRoot = t "/" (def {
@@ -169,13 +175,13 @@ let
       testMultiPath = t "foo/bar/baz" (def {
         pathSpec = [ (lit "foo") (lit "bar") (lit "baz") ];
       });
-      testGlobPath = t "/*/*/bar/*" (def {
+      testGlobPath = t "/*/*ab*c/bar/*" (def {
         isRooted = true;
-        pathSpec = [ starGlob starGlob (lit "bar") starGlob ];
+        pathSpec = [ (starGlob "*") (starGlob "*ab*c") (lit "bar") (starGlob "*") ];
       });
       testGlobEmptyPath = t "*//bar/*/" (def {
         isDir = true;
-        pathSpec = [ starGlob (lit "") (lit "bar") starGlob ];
+        pathSpec = [ (starGlob "*") (lit "") (lit "bar") (starGlob "*") ];
       });
     };
 
@@ -190,7 +196,15 @@ let
       globPathSpecLen = builtins.length glob.pathSpec;
       matchSpec = specElem: pathElem: match {
         literal = l: l == pathElem;
-        starGlob = _: true;
+        # we translate to a regex and check
+        # Since we forbid \ alltogether, we don’t have to worry about \*
+        starGlob = s:
+          builtins.match
+            # based on tests, foo* matches fooabc as well as foo
+            # (* expands to the empty string as well)
+            (builtins.replaceStrings [ "*" ] [ ".*" ] s)
+            pathElem
+          != null;
       } specElem;
       # all path elements have to match the glob from the left
       matchPermutation = subPathElems:
@@ -247,6 +261,12 @@ let
       testGlobSimple1 = y file "/hi/*/foo" "hi/im/foo";
       testGlobSimple2 = y file "/hi/*/foo" "hi/your/foo";
       testGlobSimple3 = n file "/hi/*/foo" "hi/your/notfoo";
+      # and multiple stars also work
+      testGlobMultiple1 = y file "/hi/*u*/foo" "hi/your/foo";
+      testGlobMultiple2 = y file "/hi/*u*bc/foo" "hi/yourabc/foo";
+      testGlobMultiple3 = n file "/hi/*u*z*bc*/foo" "hi/yourabc/foo";
+      # * expands to the empty string as well
+      testGlobEmpty1 = y file "/*foo*" "foo";
       # tests for non-rooted files
       # we have to match those on every possible subpath
       testNonRootedGood1 = y file "hi" "hi";
