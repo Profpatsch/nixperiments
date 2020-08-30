@@ -81,8 +81,8 @@ let
 
 
   pathElemMatchers = builtins.concatStringsSep "|" [
-    ''(\*)''           # 0: a string with exactly one * is supported
-    ''.*([[*?\]).*''   # 1: check for unsupported metacharacters
+    ''.*([[?\]).*''   # 0: check for unsupported metacharacters
+    ''(\*)''           # 1: a string with exactly one * is supported
     # ''.*(\\*\\*).*'' # check for **, not supported
     ''(.*)''           # 2: anything else
   ];
@@ -109,12 +109,12 @@ let
         at = builtins.elemAt res;
     in   if res == null then
       abort "toPathSpec: should not happen (nothing matched)"
-    else if at 0 == "*" then { starGlob = {}; }
-    else if at 1 != null then
+    else if at 0 != null then
       abort ''
         .gitignore: We don’t support these globbing metacharacters: ?\[*
         The problematic line is ${elem}
       ''
+    else if at 1 == "*" then { starGlob = {}; }
     else let two = at 2;
       in if two != null then { literal = two; }
     else abort "toPathSpec: should not happen (${toString res})";
