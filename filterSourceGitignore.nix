@@ -325,4 +325,9 @@ let
 
 # TODO: test suite
 # in matchLineTests ++ globSpecTests ++ pathMatchesGlobTest
-in filterSourceGitignore
+in {
+  inherit
+    filterSourceGitignore
+    filterSourceGitignoreWith
+    ;
+}
