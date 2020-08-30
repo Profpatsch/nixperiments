@@ -280,25 +280,33 @@ let
   # and uses the .gitignore file as the predicate on which files
   # to copy to the nix store.
   filterSourceGitignore = gitignorePath: src:
+    filterSourceGitignoreWith {
+      globs = splitLines (builtins.readFile gitignorePath);
+    } src;
+
+  filterSourceGitignoreWith = {
+    globs,
+    # globspecPred ? lib.id
+  }: src:
     let
       # map, but removes elements for which f returns null
       mapMaybe = f: xs: builtins.filter (x: x != null) (map f xs);
       # turn path to glob, return all ignored lines
-      globs = mapMaybe (p: match {
+      globSpecs = mapMaybe (p: match {
           ignored = _: null;
           glob = lib.id;
         } (toGlobSpec (matchLine p)))
-        (splitLines (builtins.readFile gitignorePath));
+        globs;
       # the actual predicate that returns whether a file should be ignored
       shouldIgnore = path: type:
         assert lib.assertMsg (type != "unknown")
           (''filterSourceGitignore: file ${path} is of type "unknown"''
           + ", which we don’t support");
         # remove the absolute path prefix
-        # of the parent dir of our gitignore
-        # (the globs are relative to the gitignore file)
+        # of the parent dir of our gitignore, the src
+        # (the globs are relative to that directory)
         let relPath = lib.removePrefix
-              (toString (builtins.dirOf gitignorePath) + "/")
+              (toString src + "/")
               (builtins.toString path);
         in
            # .git is always ignored by default
@@ -306,7 +314,7 @@ let
            # if any glob matches, the file is ignored
         || builtins.any
              (pathMatchesGlob (type == "directory") relPath)
-             globs;
+             globSpecs;
     in builtins.filterSource (p: t: ! shouldIgnore p t) src;
 
 
