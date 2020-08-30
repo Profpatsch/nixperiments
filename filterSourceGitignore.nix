@@ -80,10 +80,10 @@ let
 
 
   pathElemMatchers = builtins.concatStringsSep "|" [
-    ''.*([[?\]).*''   # 0: check for unsupported metacharacters
-    ''.*(\*\*).*'' # 1: check for unsupported double glob
-    ''(.*\*.*)'' # 2: a string containing a simple glob is supported
-    ''(.*)''           # 3: anything else
+    ''.*([[?\]).*'' # 0: check for unsupported metacharacters
+    ''.*(\*\*).*''  # 1: check for unsupported double glob
+    ''(.*\*.*)''    # 2: a string containing a simple glob is supported
+    ''(.*)''        # 3: anything else
   ];
 
   # GlobSpec:
@@ -276,6 +276,14 @@ let
       testNonRootedDirBad = n dir "hi/*" "baz/nope/foo";
     };
 
+  # Reads a gitignore file and splits it into separate lines.
+  # Make sure you reference the of the surrounding src as string (toString),
+  # otherwise it will be copied to the store.
+  # Example: "${toString src}/.gitignore"
+  # TODO: Maybe also immediately parse it into globspecs?
+  readGitignoreFile = path:
+    splitLines (builtins.readFile path);
+
   # takes a source directory, and uses the .gitignore file
   # in that source directory as the predicate for which files
   # to copy to the nix store.
@@ -283,7 +291,7 @@ let
   # to use, use filterSourceGitignoreWith.
   filterSourceGitignore = src:
     filterSourceGitignoreWith {
-      globs = splitLines (builtins.readFile "${toString src}/.gitignore");
+      globs = readGitignoreFile "${toString src}/.gitignore";
     } src;
 
   filterSourceGitignoreWith = {
@@ -330,6 +338,8 @@ let
 in {
   inherit
     filterSourceGitignore
+
     filterSourceGitignoreWith
+    readGitignoreFile
     ;
 }
