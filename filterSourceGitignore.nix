@@ -285,18 +285,23 @@ let
     } src;
 
   filterSourceGitignoreWith = {
-    globs,
-    # globspecPred ? lib.id
+    # list of lines in the .gitignore file
+    gitignoreLines,
+    # receives the parsed, structured gitignore Globs
+    # (see `toPathSpec` docs) and can map them.
+    # It is passed to `mapMaybe`,
+    # so entries that map to `null` are filtered out.
+    globMap ? lib.id
   }: src:
     let
       # map, but removes elements for which f returns null
       mapMaybe = f: xs: builtins.filter (x: x != null) (map f xs);
       # turn path to glob, return all ignored lines
-      globSpecs = mapMaybe (p: match {
+      globs = mapMaybe (p: match {
           ignored = _: null;
-          glob = lib.id;
+          glob = globMap;
         } (toGlobSpec (matchLine p)))
-        globs;
+        gitignoreLines;
       # the actual predicate that returns whether a file should be ignored
       shouldIgnore = path: type:
         assert lib.assertMsg (type != "unknown")
@@ -314,7 +319,7 @@ let
            # if any glob matches, the file is ignored
         || builtins.any
              (pathMatchesGlob (type == "directory") relPath)
-             globSpecs;
+             globs;
     in builtins.filterSource (p: t: ! shouldIgnore p t) src;
 
 
