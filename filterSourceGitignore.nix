@@ -294,7 +294,16 @@ let
       gitignoreLines = readGitignoreFile "${toString src}/.gitignore";
     } src;
 
-  filterSourceGitignoreFilter = {
+  # More generic function that takes an attrset of options and a source directory.
+  # See filterSourceGitignoreWith for the available args.
+  filterSourceGitignoreWith = args: src:
+    builtins.filterSource (filterSourceGitignoreWithFilter (args // {
+      prefix = toString src + "/";
+    })) src;
+
+  # Filter form of `filterSourceGitignoreWith`
+  # that can be passed to `builtins.path` or composed with other source filters.
+  filterSourceGitignoreWithFilter = {
     # list of lines in the .gitignore file
     gitignoreLines,
     # receives the parsed, structured gitignore Globs
@@ -337,11 +346,6 @@ let
              globs;
     in ! shouldIgnore path type;
 
-    filterSourceGitignoreWith = args: src:
-      builtins.filterSource (filterSourceGitignoreFilter (args // {
-        prefix = toString src + "/";
-      })) src;
-
 
 # TODO: test suite
 # in matchLineTests ++ globSpecTests ++ pathMatchesGlobTest
@@ -349,8 +353,8 @@ in {
   inherit
     filterSourceGitignore
 
-    filterSourceGitignoreFilter
     filterSourceGitignoreWith
+    filterSourceGitignoreFilter
     readGitignoreFile
     ;
 }
