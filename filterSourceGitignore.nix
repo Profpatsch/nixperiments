@@ -291,7 +291,7 @@ let
   # to use, use filterSourceGitignoreWith.
   filterSourceGitignore = src:
     filterSourceGitignoreWith {
-      globs = readGitignoreFile "${toString src}/.gitignore";
+      gitignoreLines = readGitignoreFile "${toString src}/.gitignore";
     } src;
 
   filterSourceGitignoreWith = {
