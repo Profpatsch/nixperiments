@@ -294,15 +294,18 @@ let
       globs = readGitignoreFile "${toString src}/.gitignore";
     } src;
 
-  filterSourceGitignoreWith = {
+  filterSourceGitignoreFilter = {
     # list of lines in the .gitignore file
     gitignoreLines,
     # receives the parsed, structured gitignore Globs
     # (see `toPathSpec` docs) and can map them.
     # It is passed to `mapMaybe`,
     # so entries that map to `null` are filtered out.
-    globMap ? lib.id
-  }: src:
+    globMap ? lib.id,
+    # The prefix in the nix store to be stripped,
+    # i.e. toString src + "/"
+    prefix
+  }:
     let
       # map, but removes elements for which f returns null
       mapMaybe = f: xs: builtins.filter (x: x != null) (map f xs);
@@ -321,7 +324,7 @@ let
         # of the parent dir of our gitignore, the src
         # (the globs are relative to that directory)
         let relPath = lib.removePrefix
-              (toString src + "/")
+              prefix
               (builtins.toString path);
         in
            # .git is always ignored by default
@@ -330,7 +333,12 @@ let
         || builtins.any
              (pathMatchesGlob (type == "directory") relPath)
              globs;
-    in builtins.filterSource (p: t: ! shouldIgnore p t) src;
+    in p: t: ! shouldIgnore p t;
+
+    filterSourceGitignoreWith = args: src:
+      builtins.filterSource (filterSourceGitignoreFilter (args // {
+        prefix = toString src + "/";
+      })) src;
 
 
 # TODO: test suite
@@ -339,6 +347,7 @@ in {
   inherit
     filterSourceGitignore
 
+    filterSourceGitignoreFilter
     filterSourceGitignoreWith
     readGitignoreFile
     ;
