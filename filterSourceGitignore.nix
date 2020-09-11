@@ -306,6 +306,8 @@ let
     # i.e. toString src + "/"
     prefix
   }:
+  # filter arguments passed by `builtins.filterSource`
+  path: type:
     let
       # map, but removes elements for which f returns null
       mapMaybe = f: xs: builtins.filter (x: x != null) (map f xs);
@@ -316,24 +318,24 @@ let
         } (toGlobSpec (matchLine p)))
         gitignoreLines;
       # the actual predicate that returns whether a file should be ignored
-      shouldIgnore = path: type:
-        assert lib.assertMsg (type != "unknown")
-          (''filterSourceGitignore: file ${path} is of type "unknown"''
+      shouldIgnore = p: t:
+        assert lib.assertMsg (t != "unknown")
+          (''filterSourceGitignore: file ${p} is of type "unknown"''
           + ", which we don’t support");
         # remove the absolute path prefix
         # of the parent dir of our gitignore, the src
         # (the globs are relative to that directory)
         let relPath = lib.removePrefix
               prefix
-              (builtins.toString path);
+              (builtins.toString p);
         in
            # .git is always ignored by default
            (relPath == ".git")
            # if any glob matches, the file is ignored
         || builtins.any
-             (pathMatchesGlob (type == "directory") relPath)
+             (pathMatchesGlob (t == "directory") relPath)
              globs;
-    in p: t: ! shouldIgnore p t;
+    in ! shouldIgnore path type;
 
     filterSourceGitignoreWith = args: src:
       builtins.filterSource (filterSourceGitignoreFilter (args // {
